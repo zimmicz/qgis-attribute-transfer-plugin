@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/AttributeTransfer" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>
