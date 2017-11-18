@@ -28,7 +28,7 @@ repository=https://github.com/zimmicz/qgis-attribute-transfer-plugin
 # Tags are comma separated with spaces allowed
 tags=
 
-homepage=
+homepage=https://github.com/zimmicz/qgis-attribute-transfer-plugin
 category=Vector
 icon=icon.png
 # experimental flag
