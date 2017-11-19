@@ -204,8 +204,8 @@ class AttributeTransfer:
         self.editable_vectors = [v for v in self.vectors if v.dataProvider(
         ).capabilities() & QgsVectorDataProvider.AddAttributes]
 
-        sorted(self.vectors)
-        sorted(self.editable_vectors)
+        sorted(self.vectors, key=lambda v: v.name())
+        sorted(self.editable_vectors, key=lambda v: v.name())
 
         self.dlg.sourceLayer.addItems([v.name() for v in self.vectors])
 
