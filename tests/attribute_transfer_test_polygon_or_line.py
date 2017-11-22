@@ -12,7 +12,7 @@ from utilities import get_qgis_app
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 from attribute_transfer import AttributeTransfer
-from create_dummy_data import create_dummy_data
+from create_dummy_data import create_dummy_data_polygon_or_line
 
 sip.setapi('QtCore', 2)
 sip.setapi('QString', 2)
@@ -27,19 +27,19 @@ QGIS_APP = get_qgis_app()
 IFACE = QGIS_APP[2]
 
 
-class AttributeTransferTest(unittest.TestCase):
+class AttributeTransferTestPolygonOrLine(unittest.TestCase):
 
     def setUp(self):
         self.source_layer = QgsVectorLayer(
-            "Point?crs=epsg:4326&field=id:integer&field=textAttr:string&field=intAttr:integer&field=decAttr:double&field=dateAttr:date&index=yes", "source layer", "memory")
+            "Polygon?crs=epsg:4326&field=id:integer&field=textAttr:string&field=intAttr:integer&field=decAttr:double&field=dateAttr:date&index=yes", "source layer", "memory")
         self.target_layer = QgsVectorLayer(
-            "Point?crs=epsg:4326&field=id:integer&index=yes", "target layer", "memory")
+            "Linestring?crs=epsg:4326&field=id:integer&index=yes", "target layer", "memory")
         self.widget = AttributeTransfer(IFACE)
 
         registry = QgsMapLayerRegistry.instance()
         registry.removeAllMapLayers()
         registry.addMapLayers([self.source_layer, self.target_layer])
-        create_dummy_data(self.source_layer, self.target_layer)
+        create_dummy_data_polygon_or_line(self.source_layer, self.target_layer)
         self.widget.initGui()
         self.widget.vectors = [self.source_layer, self.target_layer]
         self.widget.editable_vectors = [self.source_layer, self.target_layer]

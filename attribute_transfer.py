@@ -229,21 +229,72 @@ class AttributeTransfer:
             return target_layer.addAttribute(target_attr)
 
         def load_data():
-            source_layer_index = QgsSpatialIndex(source_layer.getFeatures())
-            source_layer_features = {feature.id(): feature for (
+            # 0 = point, 1 = line, 2 = polygon
+            valid_types = [0, 1, 2]
+            source_geom_type = source_layer.geometryType()
+            target_geom_type = target_layer.geometryType()
+
+            def _load_point_data():
+                if target_geom_type == 0:
+                    """Point target layer. It is safe to create index on source layer."""
+                    spatial_index = QgsSpatialIndex(source_layer.getFeatures())
+                    source_features = {feature.id(): feature for (
+                    feature) in source_layer.getFeatures()}
+                    target_features = target_layer.getFeatures()
+                else:
+                    """Point source layer and non-point target layer. It is safe
+                    to switch layers and do the same as in previous situation."""
+                    spatial_index = QgsSpatialIndex(target_layer.getFeatures())
+                    source_features = {feature.id(): feature for (
+                    feature) in target_layer.getFeatures()}
+                    target_features = source_layer.getFeatures()
+
+                for f in target_features:
+                    nearest = spatial_index.nearestNeighbor(
+                        f.geometry().asPoint(), 1)[0]
+                    if target_geom_type == 0:
+                        value = source_features[
+                        nearest].attribute(source_attribute_name)
+                    else:
+                        value = target_features[
+                        nearest].attribute(source_attribute_name)
+                    # look for the last attribute in the attribute list
+                    if not target_layer.changeAttributeValue(f.id(), max(target_layer.attributeList()), value):
+                        return False
+                return True
+
+            def _load_polygon_or_line_data():
+                spatial_index = QgsSpatialIndex(source_layer.getFeatures())
+                source_features = {feature.id(): feature for (
                 feature) in source_layer.getFeatures()}
-            target_layer_features = target_layer.getFeatures()
+                target_features = target_layer.getFeatures()
+                distance = None
+                value = None
 
-            for f in target_layer_features:
-                nearest = source_layer_index.nearestNeighbor(
-                    f.geometry().asPoint(), 1)[0]
-                value = source_layer_features[
-                    nearest].attribute(source_attribute_name)
-                # look for the last attribute in the attribute list
-                if not target_layer.changeAttributeValue(f.id(), max(target_layer.attributeList()), value):
-                    return False
+                for tf in target_features:
+                    ids = spatial_index.intersects(tf.geometry().boundingBox())
+                    for id in ids:
+                        f = source_features[id]
+                        d = f.geometry().distance(tf.geometry())
 
-            return True
+                        if distance is None or d < distance:
+                            distance = d
+                            value = f.attribute(source_attribute_name)
+
+                    result = target_layer.changeAttributeValue(tf.id(), max(target_layer.attributeList()), value)
+                    distance = None
+                    value = None
+                return result
+
+            if source_geom_type not in valid_types or target_geom_type not in valid_types:
+                self.iface.messageBar().pushMessage("Error",
+                                                    u"Unknown geometry type found.", level=QgsMessageBar.CRITICAL)
+                return False
+
+            if source_geom_type == 0 or target_geom_type == 0:
+               return  _load_point_data()
+            else:
+                return _load_polygon_or_line_data()
 
         target_layer.startEditing()
         if create_target_attribute():
