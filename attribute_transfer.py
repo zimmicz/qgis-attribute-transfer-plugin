@@ -20,7 +20,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.core import QgsMapLayerRegistry, QgsVectorDataProvider, QgsField, QgsSpatialIndex
+from qgis.core import QgsMapLayerRegistry, QgsVectorDataProvider, QgsField, QgsSpatialIndex, QgsPoint, QgsGeometry, QgsRectangle
 from qgis.gui import QgsMessageBar
 from PyQt4.QtCore import QSettings, QTranslator, qVersion, QCoreApplication, QVariant
 from PyQt4.QtGui import QAction, QIcon, QDialogButtonBox
@@ -28,6 +28,7 @@ from PyQt4.QtGui import QAction, QIcon, QDialogButtonBox
 import resources
 # Import the code for the dialog
 from attribute_transfer_dialog import AttributeTransferDialog
+from utils import get_points_from_bbox, bbox_from_centroid, longest_distance_to_vertex
 import os.path
 
 
@@ -268,11 +269,13 @@ class AttributeTransfer:
                 source_features = {feature.id(): feature for (
                 feature) in source_layer.getFeatures()}
                 target_features = target_layer.getFeatures()
-                distance = None
-                value = None
 
                 for tf in target_features:
+                    distance = None
+                    value = None
+                    nearest_feature = None
                     ids = spatial_index.intersects(tf.geometry().boundingBox())
+
                     for id in ids:
                         f = source_features[id]
                         d = f.geometry().distance(tf.geometry())
@@ -280,10 +283,48 @@ class AttributeTransfer:
                         if distance is None or d < distance:
                             distance = d
                             value = f.attribute(source_attribute_name)
+                            nearest_feature = source_features[id]
+
+                    if nearest_feature is not None:
+                        """If any feature was found by intersecting bounding boxes,
+                        use it as a good starting point to look for features that
+                        are even closer, yet their bounding boxes do not intersect."""
+                        vertices = get_points_from_bbox(nearest_feature.geometry().boundingBox())
+                        distance_to_vertex = longest_distance_to_vertex(tf.geometry(), vertices)
+                        tf_bbox = bbox_from_centroid(tf.geometry().centroid(), distance_to_vertex)
+                        ids = spatial_index.intersects(tf_bbox)
+
+                        for id in ids:
+                            f = source_features[id]
+                            d = f.geometry().distance(tf.geometry())
+
+                            if distance is None or d < distance:
+                                distance = d
+                                value = f.attribute(source_attribute_name)
+                    else:
+                        """If no feature was found by intersecting bounding boxes,
+                        keep growing target feature bounding box until at least one
+                        intersection is found."""
+                        target_bbox = tf.geometry().boundingBox()
+                        target_bbox_height = target_bbox.height()
+                        count = 1
+
+                        while nearest_feature is None:
+                            target_bbox = target_bbox.buffer(count * target_bbox_height)
+                            ids = spatial_index.intersects(target_bbox)
+
+                            for id in ids:
+                                f = source_features[id]
+                                d = f.geometry().distance(tf.geometry())
+
+                                if distance is None or d < distance:
+                                    distance = d
+                                    value = f.attribute(source_attribute_name)
+                                    nearest_feature = source_features[id]
+                            count += 1
 
                     result = target_layer.changeAttributeValue(tf.id(), max(target_layer.attributeList()), value)
-                    distance = None
-                    value = None
+
                 return result
 
             if source_geom_type not in valid_types or target_geom_type not in valid_types:
