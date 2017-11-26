@@ -10,7 +10,7 @@
 name=AttributeTransfer
 qgisMinimumVersion=2.18
 description=Copies attribute values between two vector layers based on features proximity.
-version=0.1
+version=1.0
 author=Michal Zimmermann
 email=zimmicz@gmail.com
 
